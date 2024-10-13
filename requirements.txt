@@ -1,0 +1,13 @@
+easydict
+h5py
+nltk
+numpy
+Pillow
+protobuf
+python-dateutil
+PyYAML
+six
+tensorboardX
+torch
+torchvision
+tqdm
