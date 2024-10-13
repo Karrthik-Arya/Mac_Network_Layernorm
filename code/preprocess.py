@@ -88,7 +88,6 @@ def process_question(root, split, word_dic=None, answer_dic=None):
 
         try:
             answer = answer_dic[answer_word]
-            print(answer)
             result.append((question['image_id'], question_token, answer))
 
         except:
