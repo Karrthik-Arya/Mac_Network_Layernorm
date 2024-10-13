@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import pickle
+import re
 
 import nltk
 import tqdm
@@ -15,6 +16,42 @@ def load_answer_dict(file_path):
             word = line.strip()  
             ans_dict[word] = idx  
     return ans_dict
+
+def preprocessing(text):
+  input_text = text
+  input_text = input_text.lower()
+
+  # Removing periods except if it occurs as decimal
+  input_text = re.sub(r'(?<!\d)\.(?!\d)', '', input_text)
+
+  # Converting number words to digits
+  number_words = {
+      "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+      "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+      "ten": "10", "eleven": "11", "twelve": "12", "thirteen": "13",
+      "fourteen": "14", "fifteen": "15", "sixteen": "16", "seventeen": "17",
+      "eighteen": "18", "nineteen": "19", "twenty": "20", "thirty": "30",
+      "forty": "40", "fifty": "50", "sixty": "60", "seventy": "70",
+      "eighty": "80", "ninety": "90"
+  }
+  input_text = re.sub(r'\b(?:' + '|'.join(number_words.keys()) + r')\b', lambda x: number_words[x.group()], input_text)
+
+  # Removing articles (a, an, the)
+  if len(input_text)>3:
+    input_text = re.sub(r'\b(?:a|an|the)\b', '', input_text)
+
+  # Adding apostrophe if a contraction is missing it
+  input_text = re.sub(r'\b(\w+(?<!e)(?<!a))nt\b', r"\1n't", input_text)
+
+  # input_text = re.sub(r'\b(\w+(?<!t))ent\b', r"\1en't", input_text)
+
+  # Replacing all punctuation (except apostrophe and colon) withinput_text a space character
+  input_text = re.sub(r'[^\w\':]|(?<=\d),(?=\d)', ' ', input_text)
+
+  # Removing extra spaces
+  input_text = re.sub(r'\s+', ' ', input_text).strip()
+
+  return input_text
 
 def process_question(root, split, word_dic=None, answer_dic=None):
     if word_dic is None:
@@ -47,17 +84,19 @@ def process_question(root, split, word_dic=None, answer_dic=None):
                 word_dic[word] = word_index
                 word_index += 1
 
-        answer_word = question_id_to_answer.get(question.get('question_id'))
+        answer_word = preprocessing(question_id_to_answer.get(question.get('question_id')))
 
         try:
             answer = answer_dic[answer_word]
+            print(answer)
             result.append((question['image_id'], question_token, answer))
 
         except:
-            print("Skipped: ", question['question_id'])
+            pass
+            # print("Skipped: ", question['question_id'])
 
 
-    with open('../data/{}.pkl'.format(split), 'wb') as f:
+    with open('data/{}.pkl'.format(split), 'wb') as f:
         pickle.dump(result, f)
 
     return word_dic
@@ -87,12 +126,12 @@ def process_targ_question(root, split, word_dic=None, answer_dic=None):
                 word_dic[word] = word_index
                 word_index += 1
 
-        answer_word = question.get('answer')
+        answer_word = preprocessing(question.get('answer'))
         answer = answer_dic[answer_word]
 
         result.append((question['image'], question_token, answer))
 
-    with open('../data/targ_{}.pkl'.format(split), 'wb') as f:
+    with open('data/targ_{}.pkl'.format(split), 'wb') as f:
         pickle.dump(result, f)
 
     return word_dic
@@ -109,5 +148,5 @@ if __name__ == '__main__':
     process_targ_question(test_root, 'train', word_dic, ans_dic)
     process_targ_question(test_root, 'test', word_dic, ans_dic)
 
-    with open('../data/dic.pkl', 'wb') as f:
+    with open('data/dic.pkl', 'wb') as f:
         pickle.dump({'word_dic': word_dic, 'answer_dic': ans_dic}, f)
