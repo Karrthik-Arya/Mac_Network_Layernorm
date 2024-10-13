@@ -7,6 +7,7 @@
 import argparse, os, json
 import h5py
 import numpy as np
+import pickle
 from skimage import io, transform, color 
 
 
@@ -66,20 +67,20 @@ def run_batch(cur_batch, model):
 def main(args):
   input_paths = []
   # idx_set = set()
-  max_idx = 0
+  n = 0
   for fn in os.listdir(args.input_image_dir):
-    if not fn.endswith('.jpg'): continue
-    idx = int(os.path.splitext(fn)[0].split('_')[-1])
-    input_paths.append((os.path.join(args.input_image_dir, fn), idx))
-    max_idx = max(max_idx, idx)
+    input_paths.append((os.path.join(args.input_image_dir, fn), fn))
+    n += 1
     # idx_set.add(idx)
-  input_paths.sort(key=lambda x: x[1])
+#   input_paths.sort(key=lambda x: x[1])
   # assert len(idx_set) == len(input_paths)
   # assert min(idx_set) == 0 and max(idx_set) == len(idx_set) - 1
   if args.max_images is not None:
     input_paths = input_paths[:args.max_images]
   print(input_paths[0])
   print(input_paths[-1])
+
+  img_map = {}
 
   model = build_model(args)
 
@@ -88,38 +89,40 @@ def main(args):
     feat_dset = None
     i0 = 0
     cur_batch = []
-    idxs = []
-    for i, (path, idx) in enumerate(input_paths):
+    for i, (path, key) in enumerate(input_paths):
       img = io.imread(path)
       img = transform.resize(img, img_size)
       if img.ndim == 2:  
         img = color.gray2rgb(img)
       img = img.transpose(2, 0, 1)[None]
       cur_batch.append(img)
-      idxs.append(idx)
+      img_map[key] = i
+      
       if len(cur_batch) == args.batch_size:
         feats = run_batch(cur_batch, model)
         if feat_dset is None:
-          N = max_idx+1
+          N = n
           _, C, H, W = feats.shape
           feat_dset = f.create_dataset('features', (N, C, H, W),
                                        dtype=np.float32)
         i1 = i0 + len(cur_batch)
-        # feat_dset[i0:i1] = feats
-        for i in range(len(idxs)):
-          feat_dset[idxs[i]] = feats[i]
-          print(f"Added {idxs[i]}")
+        feat_dset[i0:i1] = feats
+        # for i in range(len(idxs)):
+        #   feat_dset[idxs[i]] = feats[i]
+        #   print(f"Added {idxs[i]}")
         i0 = i1
         print('Processed %d / %d images' % (i1, len(input_paths)))
         cur_batch = []
-        idxs = []
+
     if len(cur_batch) > 0:
       feats = run_batch(cur_batch, model)
       i1 = i0 + len(cur_batch)
-      for i in range(len(idxs)):
-        feat_dset[idxs[i]] = feats[i]
-        print(f"Added {idxs[i]}")
+      feat_dset[i0:i1] = feats
       print('Processed %d / %d images' % (i1, len(input_paths)))
+
+  with open('../data/targ_img_map.pkl', 'wb') as f:
+        pickle.dump(img_map, f)
+
 
 
 if __name__ == '__main__':

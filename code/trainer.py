@@ -16,9 +16,41 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from utils import mkdir_p, save_model, load_vocab
-from datasets import ClevrDataset, collate_fn
+from datasets import ClevrDataset, collate_fn, TestDataset
 import mac
 
+
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+def accuracy(output, target, topk=(1,)):
+    """Computes the accuracy over the k top predictions for the specified values of k"""
+    with torch.no_grad():
+        maxk = max(topk)
+        batch_size = target.size(0)
+
+        _, pred = output.topk(maxk, 1, True, True)
+        pred = pred.t()
+        correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+        res = []
+        for k in topk:
+            correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+            res.append(correct_k.mul_(100.0 / batch_size))
+        return res
 
 class Logger(object):
     def __init__(self, logfile):
@@ -74,6 +106,11 @@ class Trainer():
         self.dataset_val = ClevrDataset(data_dir=self.data_dir, split="val")
         self.dataloader_val = DataLoader(dataset=self.dataset_val, batch_size=200, drop_last=True,
                                          shuffle=False, num_workers=cfg.WORKERS, collate_fn=collate_fn)
+
+        self.dataset_test = TestDataset(data_dir=self.data_dir, split="test")
+        self.dataloader_test = DataLoader(dataset=self.dataset_test, batch_size=128, drop_last=True,
+                                         shuffle=False, num_workers=cfg.WORKERS, collate_fn=collate_fn)
+        
 
         # load model
         self.vocab = load_vocab(cfg)
@@ -146,7 +183,7 @@ class Trainer():
             ######################################################
             # (1) Prepare training data
             ######################################################
-            image, question, question_len, answer = data['image'], data['question'], data['question_length'], data['answer']
+            image, question, question_len, answer, domain = data['image'], data['question'], data['question_length'], data['answer'], data["domain"]
             answer = answer.long()
             question = Variable(question)
             answer = Variable(answer)
@@ -216,7 +253,67 @@ class Trainer():
         self.save_models(self.max_epochs)
         self.writer.close()
         print("Finished Training")
-        print("Highest validation accuracy: {} at epoch {}")
+        print(f"Highest validation accuracy: {self.previous_best_acc} at epoch {self.previous_best_epoch}")
+
+    def test(self):
+        cfg = self.cfg
+        self.set_mode("eval")
+        print("Testing...")
+
+        test_accuracy_meter = AverageMeter()
+        cat_accuracy_meters = {
+            "VQAabs": AverageMeter(),
+            "VG": AverageMeter(),
+            "GQA": AverageMeter()
+        }
+
+        for data in tqdm(self.dataloader_test):
+            image, question, question_len, answer, domain, imgfile = data['image'], data['question'], data['question_length'], data['answer'], data["domain"], data["imgfile"]
+            answer = answer.long()
+            question = Variable(question)
+            answer = Variable(answer)
+
+            if cfg.CUDA:
+                image = image.cuda()
+                question = question.cuda()
+                answer = answer.cuda().squeeze()
+            else:
+                question = question
+                image = image
+                answer = answer.squeeze()
+            
+            scores = self.model(image, question, question_len)
+
+            cat_output={
+                "GQA": [],
+                "VG": [],
+                "VQAabs": []
+            }
+            cat_ans={
+                "GQA": [],
+                "VG": [],
+                "VQAabs": []
+            }
+
+            for i, image in enumerate(imgfile):
+                cat = image.split("_")[0]
+                cat_output[cat].append(scores[i])
+                cat_ans[cat].append(answer[i])
+
+            for cat in cat_output:
+                ans = torch.tensor(cat_ans[cat]).to("cuda")
+                if(ans.size(0) > 0):
+                    pred = torch.stack(cat_output[cat]).to("cuda")
+                    acc1 = accuracy(pred, ans, topk=(1,))
+                    cat_accuracy_meters[cat].update(acc1[0].item(), ans.size(0))
+
+            acc1 = accuracy(scores, answer, topk=(1,))
+            test_accuracy_meter.update(acc1[0].item(), answer.size(0))
+
+        print(f'Total Test Accuracy: {test_accuracy_meter.avg:.2f} ')
+        for cat, acc in cat_accuracy_meters.items():
+            print(f'{cat} Test Accuracy: {acc.avg:.2f}')
+
 
     def log_results(self, epoch, dict, max_eval_samples=None):
         epoch += 1
@@ -265,7 +362,7 @@ class Trainer():
             if max_iter is not None and _iteration == max_iter:
                 break
 
-            image, question, question_len, answer = data['image'], data['question'], data['question_length'], data['answer']
+            image, question, question_len, answer, domain = data['image'], data['question'], data['question_length'], data['answer'], data["domain"]
             answer = answer.long()
             question = Variable(question)
             answer = Variable(answer)

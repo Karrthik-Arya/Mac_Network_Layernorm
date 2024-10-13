@@ -31,6 +31,20 @@ def save_model(model, optim, iter, model_dir, max_to_keep=None, model_name=""):
             os.remove(checkpoint_list[0])
             checkpoint_list = checkpoint_list[1:]
 
+def load_model(model, optim, checkpoint_path):
+    # Load the checkpoint
+    checkpoint = torch.load(checkpoint_path)
+    
+    # Load model state dictionary
+    model.load_state_dict(checkpoint['model'])
+    
+    # Load optimizer state dictionary if it's provided in the checkpoint
+    if 'optim' in checkpoint and optim is not None:
+        optim.load_state_dict(checkpoint['optim'])
+    
+    # Return the iteration number saved in the checkpoint
+    return checkpoint['iter']
+
 
 def mkdir_p(path):
     try:
