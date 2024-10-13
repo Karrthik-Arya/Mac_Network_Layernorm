@@ -103,7 +103,7 @@ if __name__ == '__main__':
 
     nltk.download('punkt')
 
-    ans_dic = load_answer_dict("../common_vocab.txt")
+    ans_dic = load_answer_dict("common_vocab.txt")
     word_dic = process_question(root, 'train', answer_dic=ans_dic)
     process_question(root, 'val', word_dic, ans_dic)
     process_targ_question(test_root, 'train', word_dic, ans_dic)
