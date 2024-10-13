@@ -112,7 +112,7 @@ def process_targ_question(root, split, word_dic=None, answer_dic=None):
     result = []
     word_index = 1
 
-    for question in tqdm.tqdm(df):
+    for _, question in tqdm.tqdm(df.iterrows(), total=len(df)):
         words = nltk.word_tokenize(question['question'])
         question_token = []
 
