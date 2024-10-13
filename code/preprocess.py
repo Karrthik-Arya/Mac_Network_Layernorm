@@ -99,7 +99,7 @@ def process_targ_question(root, split, word_dic=None, answer_dic=None):
 
 if __name__ == '__main__':
     root = sys.argv[1]
-    test_root = 'data/test'
+    test_root = 'raw_data/test'
 
     nltk.download('punkt')
 
