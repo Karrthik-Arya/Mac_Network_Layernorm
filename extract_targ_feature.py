@@ -91,6 +91,7 @@ def main(args):
     cur_batch = []
     for i, (path, key) in enumerate(input_paths):
       img = io.imread(path)
+      print(img.shape)
       img = transform.resize(img, img_size)
       if img.ndim == 2:  
         img = color.gray2rgb(img)
