@@ -93,7 +93,6 @@ def main(args):
       img = io.imread(path)
       if img.shape[2] == 4:  
         img = img[:, :, :3]
-      print(img.shape)
       img = transform.resize(img, img_size)
       if img.ndim == 2:  
         img = color.gray2rgb(img)
