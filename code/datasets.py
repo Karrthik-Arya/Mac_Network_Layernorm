@@ -52,7 +52,7 @@ class TestDataset(data.Dataset):
         with open(os.path.join(data_dir, 'targ_img_map.pkl'.format(split)), 'rb') as f:
             self.img_map = pickle.load(f)
 
-        self.img = h5py.File(os.path.join(data_dir, 'targ_{}.h5'.format(split)), 'r')['features']
+        self.img = h5py.File(os.path.join(data_dir, 'targ_images.h5'), 'r')['features']
 
     def __getitem__(self, index):
         imgfile, question, answer = self.data[index]

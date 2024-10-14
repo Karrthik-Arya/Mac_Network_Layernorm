@@ -120,7 +120,7 @@ def main(args):
       feat_dset[i0:i1] = feats
       print('Processed %d / %d images' % (i1, len(input_paths)))
 
-  with open('../data/targ_img_map.pkl', 'wb') as f:
+  with open('data/targ_img_map.pkl', 'wb') as f:
         pickle.dump(img_map, f)
 
 
