@@ -69,6 +69,7 @@ def main(args):
   # idx_set = set()
   n = 0
   for fn in os.listdir(args.input_image_dir):
+    if not (fn.endswith('.jpg') or fn.endswith('.png')): continue
     input_paths.append((os.path.join(args.input_image_dir, fn), fn))
     n += 1
     # idx_set.add(idx)
