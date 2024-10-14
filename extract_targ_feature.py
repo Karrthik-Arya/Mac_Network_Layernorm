@@ -91,6 +91,8 @@ def main(args):
     cur_batch = []
     for i, (path, key) in enumerate(input_paths):
       img = io.imread(path)
+      if image.shape[2] == 4:  
+        image = image[:, :, :3]
       print(img.shape)
       img = transform.resize(img, img_size)
       if img.ndim == 2:  
