@@ -254,6 +254,7 @@ class Trainer():
         self.writer.close()
         print("Finished Training")
         print(f"Highest validation accuracy: {self.previous_best_acc} at epoch {self.previous_best_epoch}")
+        self.test()
 
     def test(self):
         cfg = self.cfg
