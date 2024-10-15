@@ -248,7 +248,7 @@ class InputUnit(nn.Module):
 
 
 class OutputUnit(nn.Module):
-    def __init__(self, module_dim=512, num_answers=23000):
+    def __init__(self, module_dim=512, num_answers=1000):
         super(OutputUnit, self).__init__()
 
         self.question_proj = nn.Linear(module_dim, module_dim)
