@@ -33,7 +33,7 @@ def mixed_data_loader(loader1, loader2):
         except StopIteration:
             break
 
-        print(batch1)
+        # print(batch1["image"])
 
         mixed_batch = {
             "image": torch.cat(batch1["image"], batch2["image"], dim=0),

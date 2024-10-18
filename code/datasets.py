@@ -84,5 +84,5 @@ def collate_fn(batch):
         domains.append(domain)
         imgfiles.append(imgfile)
 
-    return {'image': torch.stack(images), 'question': torch.from_numpy(questions),
+    return {'image': torch.cat(images, dim=0), 'question': torch.from_numpy(questions),
             'answer': torch.LongTensor(answers), 'question_length': lengths, "domain": domains, "imgfile": imgfiles}
