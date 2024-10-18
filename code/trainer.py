@@ -33,11 +33,13 @@ def mixed_data_loader(loader1, loader2):
         except StopIteration:
             break
 
-        print(batch1["question"].shape)
+        max_q_dim = max(batch1["question"].size(1), batch2["question"].size(1))
+        batch1_padded = F.pad(batch1["question"], (0, max_q_dim - batch1["question"].size(1)))
+        batch2_padded = F.pad(batch2["question"], (0, max_q_dim - batch2["question"].size(1)))
 
         mixed_batch = {
             "image": torch.cat((batch1["image"], batch2["image"]), dim=0),
-            "question": torch.cat((batch1["question"], batch2["question"]), dim=0),  
+            "question": torch.cat((batch1_padded, batch2_padded), dim=0),  
             "question_length": batch1["question_length"] + batch2["question_length"],
             "domain": batch1["domain"] + batch2["domain"],
             "imgfile": batch1["imgfile"] + batch2["imgfile"],
