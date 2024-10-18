@@ -329,7 +329,7 @@ class Trainer():
                 image = image
                 answer = answer.squeeze()
             
-            scores = self.model(image, question, question_len)
+            scores = self.model(image, question, question_len, domain)
 
             cat_output={
                 "GQA": [],
@@ -420,8 +420,8 @@ class Trainer():
                 answer = answer.cuda().squeeze()
 
             with torch.no_grad():
-                scores = self.model(image, question, question_len)
-                scores_ema = self.model_ema(image, question, question_len)
+                scores = self.model(image, question, question_len, domain)
+                scores_ema = self.model_ema(image, question, question_len, domain)
 
             correct_ema = scores_ema.detach().argmax(1) == answer
             accuracy_ema = correct_ema.sum().cpu().numpy() / answer.shape[0]
