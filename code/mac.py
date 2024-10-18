@@ -302,7 +302,7 @@ class MACNetwork(nn.Module):
         source_mem = self.source_ln(source_mem)
         target_mem = self.target_ln(target_mem)
 
-        memory = torch.cat(source_mem, target_mem, dim = 0)
+        memory = torch.cat((source_mem, target_mem), dim = 0)
 
         # get classification
         out = self.output_unit(question_embedding, memory)
