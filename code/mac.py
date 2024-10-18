@@ -281,16 +281,28 @@ class MACNetwork(nn.Module):
 
         self.mac = MACUnit(cfg, max_step=max_step)
 
+        self.source_ln = nn.LayerNorm(512)
+        self.target_ln = nn.LayerNorm(512)
+
         init_modules(self.modules(), w_init=self.cfg.TRAIN.WEIGHT_INIT)
         nn.init.uniform_(self.input_unit.encoder_embed.weight, -1.0, 1.0)
         nn.init.normal_(self.mac.initial_memory)
 
-    def forward(self, image, question, question_len):
+    def forward(self, image, question, question_len, domain):
         # get image, word, and sentence embeddings
         question_embedding, contextual_words, img = self.input_unit(image, question, question_len)
 
         # apply MacCell
         memory = self.mac(contextual_words, question_embedding, img, question_len)
+
+        source_num = domain.count("source")
+        source_mem = memory[:source_num, :]
+        target_mem = memory[source_num:, :]
+
+        source_mem = self.source_ln(source_mem)
+        target_mem = self.target_ln(target_mem)
+
+        memory = torch.cat(source_mem, target_mem, dim = 0)
 
         # get classification
         out = self.output_unit(question_embedding, memory)

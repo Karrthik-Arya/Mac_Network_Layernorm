@@ -14,11 +14,35 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torch.optim as optim
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 
 from utils import mkdir_p, save_model, load_vocab
 from datasets import ClevrDataset, collate_fn, TestDataset
 import mac
 
+
+def mixed_data_loader(loader1, loader2):
+    while True:
+        try:
+            batch1 = next(loader1)
+        except StopIteration:
+            break
+        
+        try:
+            batch2 = next(loader2)
+        except StopIteration:
+            break
+
+        mixed_batch = {
+            "image": torch.cat(batch1["img"], batch2["img"], dim=0),
+            "question": torch.cat(batch1["question"], batch2["question"], dim=0),  
+            "question_length": batch1["question_length"] + batch2["question_length"],
+            "domain": batch1["domain"] + batch2["domain"],
+            "imgfile": batch1["imgfile"] + batch2["imgfile"],
+            "answer": torch.cat((batch1["answer"], batch2["answer"]), dim=0),          
+        }
+        
+        yield mixed_batch
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -36,6 +60,7 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
 def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""
     with torch.no_grad():
@@ -100,11 +125,15 @@ class Trainer():
 
         # load dataset
         self.dataset = ClevrDataset(data_dir=self.data_dir, split="train")
-        self.dataloader = DataLoader(dataset=self.dataset, batch_size=cfg.TRAIN.BATCH_SIZE, shuffle=True,
+        self.dataloader = DataLoader(dataset=self.dataset, batch_size=cfg.TRAIN.BATCH_SIZE*0.75, shuffle=True,
                                        num_workers=cfg.WORKERS, drop_last=True, collate_fn=collate_fn)
 
         self.dataset_val = ClevrDataset(data_dir=self.data_dir, split="val")
         self.dataloader_val = DataLoader(dataset=self.dataset_val, batch_size=200, drop_last=True,
+                                         shuffle=False, num_workers=cfg.WORKERS, collate_fn=collate_fn)
+        
+        self.dataset_targ_train = TestDataset(data_dir=self.data_dir, split="train")
+        self.dataloader_targ_train = DataLoader(dataset=self.dataset_targ_train, batch_size=cfg.TRAIN.BATCH_SIZE, drop_last=True,
                                          shuffle=False, num_workers=cfg.WORKERS, collate_fn=collate_fn)
 
         self.dataset_test = TestDataset(data_dir=self.data_dir, split="test")
@@ -175,9 +204,12 @@ class Trainer():
         train_accuracy = 0
 
         self.labeled_data = iter(self.dataloader)
+        self.targ_data = iter(self.dataloader_targ_train)
         self.set_mode("train")
 
-        dataset = tqdm(self.labeled_data)
+        mixed_loader = mixed_data_loader(self.labeled_data, self.targ_data)
+
+        dataset = tqdm(mixed_loader)
 
         for data in dataset:
             ######################################################
@@ -202,11 +234,21 @@ class Trainer():
             ############################
             self.optimizer.zero_grad()
 
-            scores = self.model(image, question, question_len)
+            scores = self.model(image, question, question_len, domain)
             # print(scores.shape)
             # print(answer.shape)
             # print(answer.min(), answer.max())
-            loss = self.loss_fn(scores, answer)
+            source_num = domain.count("source")
+            source_ln_params = torch.cat((self.model.source_ln.weight, self.model.source_ln.bias), dim =0 )
+            target_ln_params = torch.cat((self.model.target_ln.weight, self.model.target_ln.bias), dim =0 )
+            cosine_sim = F.cosine_similarity(source_ln_params, target_ln_params, dim=0)
+            cosine_loss = -cosine_sim.mean()
+
+            loss = self.loss_fn(scores[:source_num], answer[:source_num])
+            probs = F.softmax(scores[source_num:], dim=-1)
+            self_entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1).mean()
+            loss += cosine_loss
+            loss += self_entropy
             loss.backward()
 
             if self.cfg.TRAIN.CLIP_GRADS:
