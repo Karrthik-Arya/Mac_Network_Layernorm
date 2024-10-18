@@ -36,8 +36,8 @@ def mixed_data_loader(loader1, loader2):
         # print(batch1["image"])
 
         mixed_batch = {
-            "image": torch.cat(batch1["image"], batch2["image"], dim=0),
-            "question": torch.cat(batch1["question"], batch2["question"], dim=0),  
+            "image": torch.cat((batch1["image"], batch2["image"]), dim=0),
+            "question": torch.cat((batch1["question"], batch2["question"]), dim=0),  
             "question_length": batch1["question_length"] + batch2["question_length"],
             "domain": batch1["domain"] + batch2["domain"],
             "imgfile": batch1["imgfile"] + batch2["imgfile"],
